@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moseq-syllable-clips"
+authors = [
+    {name = "Joshua K. Thackray", email = "thackray@rutgers.edu"},
+]
+description="Package to generate syllable clips from moseq data."
+requires-python = "~=3.7"
+keywords = ["moseq", "behavior"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3.7",
+]
+dependencies = [
+    "click==7.0",
+    "h5py==2.10.0",
+    "matplotlib==3.1.2",
+    "numpy==1.18.3",
+    "pandas==1.0.5",
+    "scipy==1.3.2",
+    "tqdm==4.48.0",
+    "typing-extensions",
+]
+dynamic = ["version", "readme"]
+
+[tool.setuptools.dynamic]
+version = {attr = "syllable_clips.__version__"}
+readme = {file = ["README.md"], content-type="text/markdown"}
+
+[project.scripts]
+syllable-clips = "syllable_clips.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "requests",
+    "pytest",
+    "pytest-cov",
+    "black",
+    "mypy",
+    "pydocstyle[toml]",
+    "twine",
+    "build",
+]
+
+[project.urls]
+Homepage = "https://github.com/tischfieldlab/fptools"
+Repository = "https://github.com/tischfieldlab/fptools"
+
+[tool.setuptools.packages.find]
+exclude = [
+    "tests*",
+    "docs*"
+]
+
+[tool.setuptools.exclude-package-data]
+tests = ["*"]
+docs = ["*"]
+
+[tool.black]
+line-length = 140
+color = true
+extend-exclude = '''
+    (
+        notebooks*
+      | tests*
+    )
+'''
+
+[tool.pydocstyle]
+convention = "google"
+match-dir = "^((?!notebooks|\\.).)*$"
+add-ignore = "D100,D101,D104"
+
+[tool.mypy]
+modules = ["syllable_clips"]
+follow_imports = "normal"
+ignore_missing_imports = "True"
+ignore_missing_imports_per_module = "True"
+warn_unused_configs = "True"
+
+[tool.pytest.ini_options]
+addopts = "--durations=0"
+testpaths = [
+    "tests",
+]
