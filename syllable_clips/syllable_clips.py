@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
-import argparse
 import collections
 import json
 import os
-import shutil
 import sys
 import tarfile
 from concurrent.futures import ProcessPoolExecutor, wait
@@ -13,7 +11,6 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import psutil
 from moseq2_viz.viz import clean_frames
 from moviepy.editor import (CompositeVideoClip, ImageClip, ImageSequenceClip,
                             VideoFileClip, clips_array)
@@ -21,8 +18,8 @@ from moviepy.video.fx.crop import crop as moviepy_crop
 from tqdm import tqdm
 
 from syllable_clips.slice import expand_slice, load_h5_timestamps, prep_slice_data
-from moseq_session_io.inspect import find_sessions_path, load_timestamps
-
+from moseq_session_io.inspect import find_sessions_path
+from moseq_session_io.util import ProgressFileObject, load_timestamps
 
 
 
@@ -278,7 +275,6 @@ def fetch_rgb_clip(slice, raw_data_path, session_id, scratch_dir='', rgb_name='r
                             tar_members[tar_names.index(rgb_name)],
                             tar_members[tar_names.index(rgb_ts_name)]
                         ]
-                        ensure_dir(scratch_dir)
                         pfo.progress.set_description('Extracting')
                         pfo.progress.reset(total=sum([m.size for m in to_extract]))
                         tar.extractall(path=scratch_dir, members=to_extract)
@@ -342,7 +338,6 @@ def fetch_ir_clip(slice, raw_data_path, session_id, scratch_dir='', ir_name='ir.
                             tar_members[tar_names.index(ir_name)],
                             tar_members[tar_names.index(ir_ts_name)]
                         ]
-                        ensure_dir(scratch_dir)
                         pfo.progress.set_description('Extracting')
                         pfo.progress.reset(total=sum([m.size for m in to_extract]))
                         tar.extractall(path=scratch_dir, members=to_extract)

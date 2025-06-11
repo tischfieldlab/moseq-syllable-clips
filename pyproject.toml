@@ -45,8 +45,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tischfieldlab/fptools"
-Repository = "https://github.com/tischfieldlab/fptools"
+Homepage = "https://github.com/tischfieldlab/moseq-syllable-clips"
+Repository = "https://github.com/tischfieldlab/moseq-syllable-clips"
 
 [tool.setuptools.packages.find]
 exclude = [
