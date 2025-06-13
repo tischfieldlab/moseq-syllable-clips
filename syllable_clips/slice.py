@@ -27,7 +27,7 @@ def load_h5_timestamps(h5: h5py.File, ts_path: Optional[str]=None) -> np.ndarray
             if s in h5:
                 ts_path = s
                 break
-    
+
     if ts_path not in h5:
         raise RuntimeError('Could not find timestamps for file {}'.format(h5.filename))
 
@@ -36,18 +36,21 @@ def load_h5_timestamps(h5: h5py.File, ts_path: Optional[str]=None) -> np.ndarray
 
 
 Slice = Tuple[Tuple[int, int], str, str]
-SliceInfo = TypedDict('SliceInfo', {
-    'session_id': str,      # session ID
-    'uuid': str,            # extraction UUID
-    'onset_idx': int,       # index of the start of emission
-    'offset_idx': int,      # index of the stop of emission
-    'onset_time': float,    # Wall clock time of the start of emission, relative to beginning of recording
-    'offset_time': float,   # Wall clock time of the stop of emission, relative to beginning of recording
-    'start_idx': int,       # index of the start of slice (possibly expanded)
-    'end_idx': int,         # index of the end of slice (possibly expanded)
-    'start_time': float,    # Wall clock time of the start of slice (possibly expanded), relative to beginning of recording
-    'end_time': float       # Wall clock time of the end of slice (possibly expanded), relative to beginning of recording
-})
+""" A slice is a tuple of the form ((start, end), uuid, h5_path)."""
+
+class SliceInfo(TypedDict):
+    session_id: str      # session ID
+    uuid: str            # extraction UUID
+    onset_idx: int       # index of the start of emission
+    offset_idx: int      # index of the stop of emission
+    onset_time: str      # Wall clock time of the start of emission relative to beginning of recording
+    offset_time: str     # Wall clock time of the stop of emission relative to beginning of recording
+    start_idx: int       # index of the start of slice (possibly expanded)
+    end_idx: int         # index of the end of slice (possibly expanded)
+    start_time: str      # Wall clock time of the start of slice (possibly expanded) relative to beginning of recording
+    end_time: str        # Wall clock time of the end of slice (possibly expanded) relative to beginning of recording
+    duration: float      # duration of the slice in seconds
+
 def expand_slice(slice: Slice, t_prepend: float=0.0, t_append: float=0.0, manifest_path: Optional[str]=None,
                  manifest_session_id_col: Optional[str]=None, manifest_uuid_col: Optional[str]=None) -> Tuple[Slice, SliceInfo]:
     ''' Expands a slice by the specified amount of time. Returned slice 
@@ -72,7 +75,6 @@ def expand_slice(slice: Slice, t_prepend: float=0.0, t_append: float=0.0, manife
     with h5py.File(slice[2], 'r') as h5:
         all_timestamps = load_h5_timestamps(h5)
         ts_length = len(all_timestamps)
-        slice.append((all_timestamps[slice[0][1]] - all_timestamps[slice[0][0]]) / 1000)
 
         p_offset = 0
         p_start = e_start = all_timestamps[slice[0][0]]
@@ -89,7 +91,7 @@ def expand_slice(slice: Slice, t_prepend: float=0.0, t_append: float=0.0, manife
                 a_offset += 1
                 a_end = all_timestamps[slice[0][1] + a_offset]
 
-        info = {
+        info: SliceInfo = {
             'session_id': get_session_id(h5, manifest_path=manifest_path, manifest_session_id_col=manifest_session_id_col, manifest_uuid_col=manifest_uuid_col),
             'uuid': h5['/metadata/uuid'][()],
             'onset_idx': slice[0][0],
@@ -99,32 +101,33 @@ def expand_slice(slice: Slice, t_prepend: float=0.0, t_append: float=0.0, manife
             'start_idx': slice[0][0] + p_offset,
             'end_idx': slice[0][1] + a_offset,
             'start_time': str(timedelta(seconds=(p_start - all_timestamps[0]) / 1000)),
-            'end_time': str(timedelta(seconds=(a_end - all_timestamps[0]) / 1000))
+            'end_time': str(timedelta(seconds=(a_end - all_timestamps[0]) / 1000)),
+            'duration': (all_timestamps[slice[0][1]] - all_timestamps[slice[0][0]]) / 1000
         }
 
-        slice[0] = (slice[0][0] + p_offset, slice[0][1] + a_offset)
+        slice = ((slice[0][0] + p_offset, slice[0][1] + a_offset), slice[1], slice[2])
     return (slice, info)
 #end prepare_slice()
 
 CountMode = Literal['usage', 'frames']
-def prep_slice_data(model: str, index: str, sort_labels: bool=True, count: CountMode='usage') -> Callable[[int, CountMode], List[Slice]]:
+def prep_slice_data(model_file: str, index_file: str, sort_labels: bool=True, count: CountMode='usage') -> Callable[[int, "SortMethod"], List[Slice]]:
     ''' From a model and index, prepare slices
 
     Parameters:
-        model: (string) model file to use
-        index: (string) index file to use
+        model_file: (string) model file to use
+        index_file: (string) index file to use
         sort_labels: (bool) sort labels by `count` or not
         count: (string) method used for counting/sorting
 
     Returns:
         function (sid, method) => slices[]
     '''
-    index, sorted_index = parse_index(index)
-    model = parse_model_results(model, sort_labels_by_usage=sort_labels, count=count)
+    index, sorted_index = parse_index(index_file)
+    model = parse_model_results(model_file, sort_labels_by_usage=sort_labels, count=count)
 
-    def fetch_slices(sid: int, method: CountMode):
+    def fetch_slices(sid: int, sort_method: SortMethod):
         slices = get_syllable_slices(sid, model['labels'], model['keys'], sorted_index)
-        return sort_slices(slices, method)
+        return sort_slices(slices, sort_method)
 
     return fetch_slices
 #end prep_data()
@@ -188,7 +191,10 @@ def get_session_id(h5: h5py.File, pattern: str=r'session_\d+', manifest_path: Op
         if not isinstance(in_file, str):
             in_file = in_file.decode('utf-8') # might be bytes!
         session_pattern = re.compile(pattern)
-        session_id = session_pattern.search(in_file).group()
+        match = session_pattern.search(in_file)
+        if match is None:
+            raise RuntimeError(f"Could not find session ID in {in_file} using pattern {pattern}")
+        session_id = match.group()
     else:
         manifest = pd.read_csv(manifest_path, sep='\t')
         uuid = h5['/metadata/uuid'][()]

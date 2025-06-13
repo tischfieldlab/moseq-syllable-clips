@@ -2,21 +2,23 @@
 
 
 import io
+import logging
 import os
 import re
 import sys
 import tarfile
-from typing import List, Optional, TypedDict, Union
+from typing import List, Optional, Union
+from typing_extensions import TypedDict
 
-from tqdm import tqdm
+import tqdm
 
 
-SessionInfo = TypedDict('SessionInfo', {
-    'is_compressed': bool,
-    'session_id': str,
-    'directory': str,
-    'metadata': str
-})
+class SessionInfo(TypedDict):
+    is_compressed: bool
+    session_id: str
+    directory: str
+    metadata: str
+
 def find_sessions_path(root_dir: Optional[Union[str, List[str]]]=None, recursive: bool=True,
                        skip_uncompressed: bool=False, uncompressed_pattern: str=r'metadata\.json',
                        skip_compressed: bool=False, compressed_pattern: str=r'session_\d+\.json') -> List[SessionInfo]:
@@ -45,13 +47,15 @@ def find_sessions_path(root_dir: Optional[Union[str, List[str]]]=None, recursive
     unc_pattern = re.compile(uncompressed_pattern)
     cmp_pattern = re.compile(compressed_pattern)
     session_pattern = re.compile(r'session_\d+')
-    results = []
+    results: List[SessionInfo] = []
     for dir_path in dirs_to_search:
         if os.path.isfile(dir_path):
             # We got a file path directly... try to handle this
             # if it is a file, it is likely a compressed session
             if dir_path.endswith('.tar.gz') and not skip_compressed:
                 m = session_pattern.search(dir_path)
+                if m is None:
+                    raise RuntimeError("Could not find session ID in {} using pattern {}".format(dir_path, session_pattern.pattern))
                 results.append({
                     'is_compressed': True,
                     'session_id': m.group(0),
@@ -131,8 +135,8 @@ def find_session_by_id(session_id: str, root_dir: Union[str, List[str]]) -> Opti
     return None
 
 
-def unpack_session(session_info: SessionInfo, to_extract: List[str], output_dir: Optional[str]=None) -> str:
-    ''' Unpacks a compressed session file into the output directory
+def unpack_session(session_info: SessionInfo, to_extract: List[str], output_dir: str) -> str:
+    '''Unpacks a compressed session file into the output directory.
 
     Parameters:
         session_path (str): Path to the compressed session file
@@ -156,12 +160,14 @@ def unpack_session(session_info: SessionInfo, to_extract: List[str], output_dir:
             tar = tarfile.open(fileobj=pfo, mode='r:gz')
             tar_members = tar.getmembers()
             tar_names = [_.name for _ in tar_members]
-            to_extract = [tar_members[tar_names.index(name)] for name in to_extract],
+            members_to_extract: List[tarfile.TarInfo] = [tar_members[tar_names.index(name)] for name in to_extract]
             pfo.progress.set_description('Extracting')
-            pfo.progress.reset(total=sum([m.size for m in to_extract]))
-            tar.extractall(path=scratch_dir, members=to_extract)
+            pfo.progress.reset(total=sum([m.size for m in members_to_extract]))
+            tar.extractall(path=scratch_dir, members=members_to_extract)
         except tarfile.TarError as e:
             raise type(e)("{}: {}".format(session_info['session_id'], str(e))).with_traceback(sys.exc_info()[2])
+
+    return scratch_dir
 
 
 class ProgressFileObject(io.FileIO):
@@ -239,10 +245,10 @@ def ensure_unpacked_sessions(raw_data_path: str, scratch_path: str, to_unpack: L
     """
     sessions = find_sessions_path(root_dir=raw_data_path)
     if any(s['is_compressed'] for s in sessions) is False:
-        print("No compressed sessions found in the raw data path. Nothing to unpack.")
+        # print("No compressed sessions found in the raw data path. Nothing to unpack.")
         return
     else:
-        print("Found {} compressed sessions to unpack.".format(len([s for s in sessions if s['is_compressed']])))
+        logging.info("Found {} compressed sessions to unpack.".format(len([s for s in sessions if s['is_compressed']])))
 
     os.makedirs(scratch_path, exist_ok=True)
     for session in tqdm(sessions, desc='Unpacking sessions', leave=False):

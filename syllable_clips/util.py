@@ -4,7 +4,7 @@ import argparse
 import io
 import json
 import os
-from typing import IO, Dict, List, Union
+from typing import IO, Dict, Union
 from typing_extensions import TypedDict
 from moseq2_viz.model.util import parse_model_results, relabel_by_usage
 
@@ -12,11 +12,11 @@ from moseq2_viz.model.util import parse_model_results, relabel_by_usage
 import numpy as np
 
 
-LabelMapping = TypedDict('LabelMapping', {
-    'raw': int,
-    'usage': int,
-    'frames': int,
-})
+class LabelMapping(TypedDict):
+    raw: int
+    usage: int
+    frames: int
+
 LabelMap = Dict[int, LabelMapping]
 def get_syllable_id_mapping(model_file: str) -> LabelMap:
     ''' Gets a mapping of syllable IDs

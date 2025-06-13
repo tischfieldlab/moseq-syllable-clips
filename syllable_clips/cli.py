@@ -9,10 +9,12 @@ import psutil
 from syllable_clips.session import ensure_unpacked_sessions
 from syllable_clips.syllable_clips import produce_clips
 from syllable_clips.util import dir_path_arg, get_max_states, get_syllable_id_mapping
+from syllable_clips import __version__
 
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     subparsers = parser.add_subparsers()
 
     single_parser = subparsers.add_parser('single', help="Render just one example of one given syllable")
@@ -73,6 +75,10 @@ def main():
         num_processors = psutil.cpu_count() if sys.platform == 'darwin' else len(psutil.Process().cpu_affinity())
         subp.add_argument('-p', '--processors', default=num_processors, type=int, help="Number of CPUs to use")
 
+    if len(sys.argv) < 2:
+        parser.print_help()
+        sys.exit(1)
+
     args = parser.parse_args()
     sys.stderr.write("Using {} processors to do work.\n".format(args.processors))
 
@@ -93,11 +99,11 @@ def main():
 
     label_map = get_syllable_id_mapping(args.model)
     if args.sort and args.count == 'usage':
-        args.label_map = { itm['usage']: itm for itm in label_map }
+        args.label_map = { itm['usage']: itm for itm in label_map.values() }
     elif args.sort and args.count == 'frames':
-        args.label_map = { itm['frames']: itm for itm in label_map }
+        args.label_map = { itm['frames']: itm for itm in label_map.values() }
     else:
-        args.label_map = { itm['raw']: itm for itm in label_map }
+        args.label_map = { itm['raw']: itm for itm in label_map.values() }
 
     args.crop_rgb = parse_crop_arg(args.crop_rgb)
     args.crop_ir = parse_crop_arg(args.crop_ir)
