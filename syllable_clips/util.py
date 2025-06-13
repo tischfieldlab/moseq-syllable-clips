@@ -1,9 +1,10 @@
 
 
 import argparse
+import io
 import json
 import os
-from typing import Dict, List
+from typing import IO, Dict, List, Union
 from typing_extensions import TypedDict
 from moseq2_viz.model.util import parse_model_results, relabel_by_usage
 
@@ -11,12 +12,13 @@ from moseq2_viz.model.util import parse_model_results, relabel_by_usage
 import numpy as np
 
 
-LabelMap = TypedDict('LabelMap', {
+LabelMapping = TypedDict('LabelMapping', {
     'raw': int,
     'usage': int,
     'frames': int,
 })
-def get_syllable_id_mapping(model_file: str) -> List[LabelMap]:
+LabelMap = Dict[int, LabelMapping]
+def get_syllable_id_mapping(model_file: str) -> LabelMap:
     ''' Gets a mapping of syllable IDs
 
     Parameters:
@@ -26,19 +28,20 @@ def get_syllable_id_mapping(model_file: str) -> List[LabelMap]:
         list of dicts, each dict contains raw, usage, and frame ID assignments
     '''
     mdl = parse_model_results(model_file, sort_labels_by_usage=False)
-    labels_usage = relabel_by_usage(mdl['labels'], count='usage')[0]
-    labels_frames = relabel_by_usage(mdl['labels'], count='frames')[0]
+    labels_usage = relabel_by_usage(mdl['labels'], count='usage')[1]
+    labels_frames = relabel_by_usage(mdl['labels'], count='frames')[1]
 
-    label_map: Dict[int, LabelMap] = {}
-    for si, sl in enumerate(mdl['labels']):
-        for i, l in enumerate(sl):
-            if l not in label_map:
-                label_map[l] = {
-                    'raw': l,
-                    'usage': labels_usage[si][i],
-                    'frames': labels_frames[si][i]
-                }
-    return list(label_map.values())
+    available_ids = list(set(labels_usage + labels_frames))
+    label_map: LabelMap = {i: {'raw': i, 'usage': -1, 'frames': -1} for i in available_ids}
+    label_map[-5] = {'raw': -5, 'usage': -5, 'frames': -5}  # -5 is the "unknown" label
+
+    for usage_id, raw_id in enumerate(labels_usage):
+        label_map[raw_id]['usage'] = usage_id
+
+    for frames_id, raw_id in enumerate(labels_frames):
+        label_map[raw_id]['frames'] = frames_id
+
+    return label_map
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -77,3 +80,30 @@ def dir_path_arg(path: str) -> str:
         return path
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path to a readable directory")
+
+
+def load_timestamps(timestamp_file: Union[str, IO[bytes]], col: int = 0) -> np.ndarray:
+    """Read timestamps from space delimited text file.
+
+    Args:
+        timestamp_file (str): path to a file containing timestamp data
+        col (int): column of the file containing timestamp data
+
+    Returns:
+    np.ndarray containing timestamp data.
+    """
+    timestamps = []
+    if isinstance(timestamp_file, str):
+        with open(timestamp_file, "r", encoding="utf-8") as ts_file:
+            for line_str in ts_file:
+                cols = line_str.split()
+                timestamps.append(float(cols[col]))
+        return np.array(timestamps)
+    elif isinstance(timestamp_file, io.BufferedReader):
+        # try iterating directly
+        for line_bytes in timestamp_file:
+            cols = line_bytes.decode().split()
+            timestamps.append(float(cols[col]))
+        return np.array(timestamps)
+    else:
+        raise ValueError("Could not understand parameter timestamp_file!")

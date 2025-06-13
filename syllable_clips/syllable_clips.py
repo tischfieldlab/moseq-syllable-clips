@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import collections
 import json
 import os
@@ -17,9 +15,9 @@ from moviepy.editor import (CompositeVideoClip, ImageClip, ImageSequenceClip,
 from moviepy.video.fx.crop import crop as moviepy_crop
 from tqdm import tqdm
 
+from syllable_clips.session import find_session_by_id
 from syllable_clips.slice import expand_slice, load_h5_timestamps, prep_slice_data
-from moseq_session_io.inspect import find_sessions_path
-from moseq_session_io.util import ProgressFileObject, load_timestamps
+from syllable_clips.util import load_timestamps
 
 
 
@@ -129,11 +127,11 @@ def generate_clips(slice, info, args):
     try:
         for stream in args.streams:
             if stream == 'rgb':
-                clip = fetch_rgb_clip(slice, args.raw_path, info['session_id'], scratch_dir=args.scratch, crop=args.crop_rgb)
+                clip = fetch_rgb_clip(slice, [args.raw_path, args.scratch_path], info['session_id'], crop=args.crop_rgb)
                 onset_size = ensure_even(int(clip.w * 0.08))
                 onset = fetch_onset_clip((onset_size, onset_size))
             if stream == 'ir':
-                clip = fetch_ir_clip(slice, args.raw_path, info['session_id'], scratch_dir=args.scratch, crop=args.crop_ir)
+                clip = fetch_ir_clip(slice, [args.raw_path, args.scratch_path], info['session_id'], crop=args.crop_ir)
                 onset_size = ensure_even(int(clip.w * 0.08))
                 onset = fetch_onset_clip((onset_size, onset_size))
             elif stream == 'depth':
@@ -247,47 +245,13 @@ def fetch_depth_clip(slice, args):
 #end fetch_depth_clip()
 
 
-def fetch_rgb_clip(slice, raw_data_path, session_id, scratch_dir='', rgb_name='rgb.mp4', rgb_ts_name='rgb_ts.txt', crop='auto'):
+def fetch_rgb_clip(slice, raw_data_path, session_id, rgb_name='rgb.mp4', rgb_ts_name='rgb_ts.txt', crop='auto'):
     with h5py.File(slice[2], 'r') as h5:
-        sessions = find_sessions_path(raw_data_path)
-        matching_sessions = list(filter(lambda s: s['session_id'] == session_id, sessions))
-        if len(matching_sessions) <= 0:
-            raise FileNotFoundError("Could not find RGB video for {} on path {}".format(session_id, raw_data_path))
-        else:
-            the_session = matching_sessions[0]
-
-        if the_session['is_compressed']:
-            scratch_dir = os.path.join(scratch_dir, session_id)
-
-            # check if this was previously extracted by us.
-            if not os.path.exists(os.path.join(scratch_dir, rgb_name)):
-                session_path = os.path.join(the_session['directory'], the_session['session_id']+'.tar.gz')
-
-                with ProgressFileObject(session_path) as pfo:
-                    pfo.progress.disable = True
-                    pfo.progress.set_description('Scanning tarball {}'.format(the_session['session_id']))
-                    pfo.progress.leave = False
-                    try:
-                        tar = tarfile.open(fileobj=pfo, mode='r:gz')
-                        tar_members = tar.getmembers()
-                        tar_names = [_.name for _ in tar_members]
-                        to_extract = [
-                            tar_members[tar_names.index(rgb_name)],
-                            tar_members[tar_names.index(rgb_ts_name)]
-                        ]
-                        pfo.progress.set_description('Extracting')
-                        pfo.progress.reset(total=sum([m.size for m in to_extract]))
-                        tar.extractall(path=scratch_dir, members=to_extract)
-                    except tarfile.TarError as e:
-                        raise type(e)("{}: {}".format(the_session['session_id'], str(e))).with_traceback(sys.exc_info()[2])
-            else:
-                pass #sys.stderr.write('Found previously extracted; using that...\n')
-
-            rgb_path = os.path.join(scratch_dir, rgb_name)
-            rgb_timestamp_path = os.path.join(scratch_dir, rgb_ts_name)
-        else:
-            rgb_path = os.path.join(the_session['directory'], rgb_name)
-            rgb_timestamp_path = os.path.join(the_session['directory'], rgb_ts_name)
+        the_session = find_session_by_id(session_id, root_dir=raw_data_path)
+        if the_session is None:
+            raise ValueError("Session with ID {} not found in {}".format(session_id, raw_data_path))
+        rgb_path = os.path.join(the_session['directory'], rgb_name)
+        rgb_timestamp_path = os.path.join(the_session['directory'], rgb_ts_name)
 
         clip = VideoFileClip(rgb_path, fps_source="tbr")
 
@@ -310,47 +274,13 @@ def fetch_rgb_clip(slice, raw_data_path, session_id, scratch_dir='', rgb_name='r
 #end fetch_rgb_clip()
 
 
-def fetch_ir_clip(slice, raw_data_path, session_id, scratch_dir='', ir_name='ir.mp4', ir_ts_name='ir_ts.txt', crop='auto'):
+def fetch_ir_clip(slice, raw_data_path, session_id, ir_name='ir.mp4', ir_ts_name='ir_ts.txt', crop='auto'):
     with h5py.File(slice[2], 'r') as h5:
-        sessions = find_sessions_path(raw_data_path)
-        matching_sessions = list(filter(lambda s: s['session_id'] == session_id, sessions))
-        if len(matching_sessions) <= 0:
-            raise FileNotFoundError("Could not find IR video for {} on path {}".format(session_id, raw_data_path))
-        else:
-            the_session = matching_sessions[0]
-
-        if the_session['is_compressed']:
-            scratch_dir = os.path.join(scratch_dir, session_id)
-
-            # check if this was previously extracted by us.
-            if not os.path.exists(os.path.join(scratch_dir, ir_name)):
-                session_path = os.path.join(the_session['directory'], the_session['session_id']+'.tar.gz')
-
-                with ProgressFileObject(session_path) as pfo:
-                    pfo.progress.disable = True
-                    pfo.progress.set_description('Scanning tarball {}'.format(the_session['session_id']))
-                    pfo.progress.leave = False
-                    try:
-                        tar = tarfile.open(fileobj=pfo, mode='r:gz')
-                        tar_members = tar.getmembers()
-                        tar_names = [_.name for _ in tar_members]
-                        to_extract = [
-                            tar_members[tar_names.index(ir_name)],
-                            tar_members[tar_names.index(ir_ts_name)]
-                        ]
-                        pfo.progress.set_description('Extracting')
-                        pfo.progress.reset(total=sum([m.size for m in to_extract]))
-                        tar.extractall(path=scratch_dir, members=to_extract)
-                    except tarfile.TarError as e:
-                        raise type(e)("{}: {}".format(the_session['session_id'], str(e))).with_traceback(sys.exc_info()[2])
-            else:
-                pass #sys.stderr.write('Found previously extracted; using that...\n')
-
-            ir_path = os.path.join(scratch_dir, ir_name)
-            ir_timestamp_path = os.path.join(scratch_dir, ir_ts_name)
-        else:
-            ir_path = os.path.join(the_session['directory'], ir_name)
-            ir_timestamp_path = os.path.join(the_session['directory'], ir_ts_name)
+        the_session = find_session_by_id(session_id, root_dir=raw_data_path)
+        if the_session is None:
+            raise ValueError("Session with ID {} not found in {}".format(session_id, raw_data_path))
+        ir_path = os.path.join(the_session['directory'], ir_name)
+        ir_timestamp_path = os.path.join(the_session['directory'], ir_ts_name)
 
         clip = VideoFileClip(ir_path, fps_source="tbr")
 

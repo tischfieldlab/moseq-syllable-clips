@@ -6,6 +6,7 @@ import sys
 import numpy as np
 import psutil
 
+from syllable_clips.session import ensure_unpacked_sessions
 from syllable_clips.syllable_clips import produce_clips
 from syllable_clips.util import dir_path_arg, get_max_states, get_syllable_id_mapping
 
@@ -77,11 +78,18 @@ def main():
 
     if args.dir is None:
         args.dir = os.path.join(os.path.dirname(os.path.abspath(args.index)), args.name)
+    os.makedirs(args.dir, exist_ok=True)
+
     if args.scratch is None:
         args.scratch = os.path.join(args.raw_path, 'scratch')
 
-    os.makedirs(args.dir, exist_ok=True)
-    os.makedirs(args.scratch, exist_ok=True)
+
+    to_extract = ['metadata.json']
+    if "rgb" in args.streams:
+        to_extract.extend(["rgb.mp4", "rgb_timestamps.txt"])
+    if "ir" in args.streams:
+        to_extract.extend(["ir.mp4", "ir_timestamps.txt"])
+    ensure_unpacked_sessions(args.raw_path, args.scratch, to_extract)
 
     label_map = get_syllable_id_mapping(args.model)
     if args.sort and args.count == 'usage':
@@ -91,33 +99,35 @@ def main():
     else:
         args.label_map = { itm['raw']: itm for itm in label_map }
 
-    if args.crop_rgb.lower() == 'none':
-        args.crop_rgb = 'none'
-    elif args.crop_rgb.lower() == 'auto':
-        args.crop_rgb = 'auto'
-    else:
-        coords = [int(x) for x in args.crop_rgb.split(',')]
-        if len(coords) != 4:
-            raise RuntimeError('Argument for --crop-rgb in valid! must be one of "auto", "none", or list of coordinates "x1,y1,x2,y2"')
-        args.crop_rgb = { k: coords[i] for i, k in enumerate(['x1','y1','x2','y2']) }
+    args.crop_rgb = parse_crop_arg(args.crop_rgb)
+    args.crop_ir = parse_crop_arg(args.crop_ir)
 
 
-    if args.crop_ir.lower() == 'none':
-        args.crop_ir = 'none'
-    elif args.crop_ir.lower() == 'auto':
-        args.crop_ir = 'auto'
-    else:
-        coords = [int(x) for x in args.crop_ir.split(',')]
-        if len(coords) != 4:
-            raise RuntimeError('Argument for --crop-ir in valid! must be one of "auto", "none", or list of coordinates "x1,y1,x2,y2"')
-        args.crop_ir = { k: coords[i] for i, k in enumerate(['x1','y1','x2','y2']) }
-
-
+    # run the command
     args.func(args)
 
     if args.cleanup:
         shutil.rmtree(args.scratch)
 #end main()
+
+def parse_crop_arg(arg):
+    ''' Parses the crop argument for rgb and ir streams.
+    
+    Parameters:
+        arg (str): Argument string to parse, should be 'auto', 'none', or 'x1,y1,x2,y2'
+    
+    Returns:
+        dict: Dictionary with keys 'x1', 'y1', 'x2', 'y2' if coordinates are provided, otherwise returns 'auto' or 'none'.
+    '''
+    if arg.lower() == 'none':
+        return 'none'
+    elif arg.lower() == 'auto':
+        return 'auto'
+    else:
+        coords = [int(x) for x in arg.split(',')]
+        if len(coords) != 4:
+            raise RuntimeError('Argument for crop in valid! must be one of "auto", "none", or list of coordinates "x1,y1,x2,y2"')
+        return { k: coords[i] for i, k in enumerate(['x1','y1','x2','y2']) }
 
 
 def single_example(args):
