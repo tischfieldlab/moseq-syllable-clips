@@ -8,7 +8,7 @@ import psutil
 
 from syllable_clips.session import ensure_unpacked_sessions
 from syllable_clips.syllable_clips import produce_clips
-from syllable_clips.util import dir_path_arg, get_max_states, get_syllable_id_mapping
+from syllable_clips.util import dir_path_arg, get_max_states, get_syllable_id_mapping, reindex_label_map
 from syllable_clips import __version__
 
 
@@ -49,7 +49,7 @@ def main():
         subp.add_argument('--fps', default=30, help="Frames per second")
         subp.add_argument('--scratch', help="Scratch location used for possible extraction")
         #subp.add_argument('--no-cleanup', action='store_false', dest='cleanup', help="Scratch location used for possible extraction")
-        subp.add_argument('--cleanup', action='store_true', dest='cleanup', help="Scratch location used for possible extraction")
+        subp.add_argument('--cleanup', action='store_true', dest='cleanup', help="Cleanup scratch directory after processing")
         subp.add_argument('--crop-rgb', action='store', default='auto', help="Crop the rgb to the bounds of the extracted region. Auto crops to the ROI from extraction (old formats not supported). None will not crop. Or supply a list of coordinates as 'x1,y1,x2,y2' ex: '20,50,100,150'")
         subp.add_argument('--crop-ir', action='store', default='auto', help="Crop the IR to the bounds of the extracted region. Auto crops to the ROI from extraction (old formats not supported). None will not crop. Or supply a list of coordinates as 'x1,y1,x2,y2' ex: '20,50,100,150'")
 
@@ -98,12 +98,9 @@ def main():
     ensure_unpacked_sessions(args.raw_path, args.scratch, to_extract)
 
     label_map = get_syllable_id_mapping(args.model)
-    if args.sort and args.count == 'usage':
-        args.label_map = { itm['usage']: itm for itm in label_map.values() }
-    elif args.sort and args.count == 'frames':
-        args.label_map = { itm['frames']: itm for itm in label_map.values() }
-    else:
-        args.label_map = { itm['raw']: itm for itm in label_map.values() }
+    if args.sort:
+        args.label_map = reindex_label_map(label_map, by=args.count)
+
 
     args.crop_rgb = parse_crop_arg(args.crop_rgb)
     args.crop_ir = parse_crop_arg(args.crop_ir)

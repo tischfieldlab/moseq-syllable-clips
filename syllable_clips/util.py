@@ -5,7 +5,7 @@ import io
 import json
 import os
 from typing import IO, Dict, Union
-from typing_extensions import TypedDict
+from typing_extensions import Literal, TypedDict
 from moseq2_viz.model.util import parse_model_results, relabel_by_usage
 
 
@@ -42,6 +42,22 @@ def get_syllable_id_mapping(model_file: str) -> LabelMap:
         label_map[raw_id]['frames'] = frames_id
 
     return label_map
+
+
+def reindex_label_map(label_map: LabelMap, by: Literal['usage', 'frames', 'raw']) -> LabelMap:
+    ''' Reindex a label map by usage, frames, or raw ID
+
+    Parameters:
+        label_map (LabelMap): The label map to reindex
+        by (str): The key to reindex by, one of {'usage', 'frames', 'raw'}
+
+    Returns:
+        LabelMap: A new label map indexed by the specified key
+    '''
+    if by not in ['usage', 'frames', 'raw']:
+        raise ValueError(f"Invalid index type '{by}'. Must be one of ['usage', 'frames', 'raw']")
+
+    return {itm[by]: itm for itm in label_map.values()}
 
 
 class NumpyEncoder(json.JSONEncoder):
