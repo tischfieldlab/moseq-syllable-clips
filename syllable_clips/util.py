@@ -25,7 +25,7 @@ def get_syllable_id_mapping(model_file: str) -> LabelMap:
         model_file (str): path to a model to interrogate
 
     Returns:
-        list of dicts, each dict contains raw, usage, and frame ID assignments
+        dict of dicts, indexed by raw id, where each sub-dict contains raw, usage, and frame ID assignments
     '''
     mdl = parse_model_results(model_file, sort_labels_by_usage=False)
     labels_usage = relabel_by_usage(mdl['labels'], count='usage')[1]
