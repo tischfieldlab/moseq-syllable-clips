@@ -97,6 +97,11 @@ def main():
         to_extract.extend(["ir.mp4", "ir_timestamps.txt"])
     ensure_unpacked_sessions(args.raw_path, args.scratch, to_extract)
 
+    # Scratch directory might not be created, if no sessions were unpacked.
+    # If it exists, we can add it to the raw_path list.
+    if os.path.exists(args.scratch):
+        args.raw_path = [args.raw_path, args.scratch]
+
     label_map = get_syllable_id_mapping(args.model)
     if args.sort:
         args.label_map = reindex_label_map(label_map, by=args.count)

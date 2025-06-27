@@ -49,6 +49,9 @@ def find_sessions_path(root_dir: Optional[Union[str, List[str]]]=None, recursive
     session_pattern = re.compile(r'session_\d+')
     results: List[SessionInfo] = []
     for dir_path in dirs_to_search:
+        if not os.path.exists(dir_path):
+            logging.warning("Path {} does not exist, skipping.".format(dir_path))
+            continue
         if os.path.isfile(dir_path):
             # We got a file path directly... try to handle this
             # if it is a file, it is likely a compressed session
