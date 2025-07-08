@@ -138,7 +138,7 @@ def find_session_by_id(session_id: str, root_dir: Union[str, List[str]]) -> Opti
     return None
 
 
-def unpack_session(session_info: SessionInfo, to_extract: List[str], output_dir: str) -> str:
+def unpack_session(session_info: SessionInfo, to_extract: List[str], output_dir: str, show_progress: bool = True) -> str:
     '''Unpacks a compressed session file into the output directory.
 
     Parameters:
@@ -149,22 +149,21 @@ def unpack_session(session_info: SessionInfo, to_extract: List[str], output_dir:
         str: Path to the unpacked session directory
     '''
     if session_info['is_compressed'] is False:
-        raise ValueError("Session is not compressed, cannot unpack: {}".format(session_info['session_id']))
+        raise ValueError(f"Session is not compressed, cannot unpack: {session_info['session_id']}")
 
     scratch_dir = os.path.join(output_dir, session_info['session_id'])
     os.makedirs(scratch_dir, exist_ok=True)
     session_path = os.path.join(session_info['directory'], session_info['session_id']+'.tar.gz')
 
-    with ProgressFileObject(session_path) as pfo:
-        pfo.progress.disable = True
-        pfo.progress.set_description('Scanning tarball {}'.format(session_info['session_id']))
+    with ProgressFileObject(session_path, tqdm_kwargs={'disable': not show_progress}) as pfo:
+        pfo.progress.set_description(f"Scanning tarball {session_info['session_id']}")
         pfo.progress.leave = False
         try:
             tar = tarfile.open(fileobj=pfo, mode='r:gz')
             tar_members = tar.getmembers()
             tar_names = [_.name for _ in tar_members]
             members_to_extract: List[tarfile.TarInfo] = [tar_members[tar_names.index(name)] for name in to_extract]
-            pfo.progress.set_description('Extracting')
+            pfo.progress.set_description("Extracting {session_info['session_id']}")
             pfo.progress.reset(total=sum([m.size for m in members_to_extract]))
             tar.extractall(path=scratch_dir, members=members_to_extract)
         except tarfile.TarError as e:
@@ -239,21 +238,32 @@ class ProgressFileObject(io.FileIO):
         return super().close()
 
 
-def ensure_unpacked_sessions(raw_data_path: str, scratch_path: str, to_unpack: List[str]) -> None:
+def ensure_unpacked_sessions(raw_data_path: str, scratch_path: str, to_unpack: List[str], filter_sessions: Optional[List[str]] = None) -> None:
     """Ensure that all sessions in the raw data path are unpacked into the scratch path.
 
     Args:
         raw_data_path (str): Path to the raw data directory containing session files.
         scratch_path (str): Path to the scratch directory where sessions should be unpacked.
+        to_unpack (list[str]): list of member names to be extracted
     """
     sessions = find_sessions_path(root_dir=raw_data_path)
-    if any(s['is_compressed'] for s in sessions) is False:
+
+    # filter sessions according to user filter list
+    if filter_sessions is not None:
+        sessions = [itm for itm in sessions if itm["session_id"] in filter_sessions]
+
+    # filter sessions to only compressed sessions
+    sessions = [s for s in sessions if s['is_compressed']]
+
+    if len(sessions) <= 0:
         # print("No compressed sessions found in the raw data path. Nothing to unpack.")
         return
     else:
-        logging.info("Found {} compressed sessions to unpack.".format(len([s for s in sessions if s['is_compressed']])))
+        logging.info(f"Found {len(sessions)} compressed sessions to unpack.")
 
     os.makedirs(scratch_path, exist_ok=True)
-    for session in tqdm(sessions, desc='Unpacking sessions', leave=False):
-        if session['is_compressed']:
+    for session in tqdm.tqdm(sessions, desc='Unpacking sessions', leave=False):
+        try:
             unpack_session(session, to_unpack, output_dir=scratch_path)
+        except Exception as e:
+            logging.warning(f"Error while unpacking {session['session_id']}, skipping: {e}")
