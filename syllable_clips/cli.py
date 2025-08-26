@@ -1,5 +1,6 @@
 import argparse
 import os
+from re import sub
 import shutil
 import sys
 
@@ -53,6 +54,10 @@ def main():
         subp.add_argument('--crop-rgb', action='store', default='auto', help="Crop the rgb to the bounds of the extracted region. Auto crops to the ROI from extraction (old formats not supported). None will not crop. Or supply a list of coordinates as 'x1,y1,x2,y2' ex: '20,50,100,150'")
         subp.add_argument('--crop-ir', action='store', default='auto', help="Crop the IR to the bounds of the extracted region. Auto crops to the ROI from extraction (old formats not supported). None will not crop. Or supply a list of coordinates as 'x1,y1,x2,y2' ex: '20,50,100,150'")
 
+        subp.add_argument('--rgb-name', action='store', default='rgb.mp4', help="Name of the rgb video file within the raw data directory")
+        subp.add_argument('--rgb-ts-name', action='store', default='rgb_ts.txt', help="Name of the rgb video timestamp file within the raw data directory")
+        subp.add_argument('--ir-name', action='store', default='ir.mp4', help="Name of the ir video file within the raw data directory")
+        subp.add_argument('--ir-ts-name', action='store', default='ir_ts.txt', help="Name of the ir video timestamp file within the raw data directory")
 
         pick_choices = ['median', 'longest', 'shortest', 'shuffle']
         subp.add_argument('--pick', choices=pick_choices, default=pick_choices[0], help="Method for choosing which syllable instance(s) to plot.")
@@ -92,9 +97,9 @@ def main():
 
     to_extract = ['metadata.json']
     if "rgb" in args.streams:
-        to_extract.extend(["rgb.mp4", "rgb_timestamps.txt"])
+        to_extract.extend([args.rgb_name, args.rgb_ts_name])
     if "ir" in args.streams:
-        to_extract.extend(["ir.mp4", "ir_timestamps.txt"])
+        to_extract.extend([args.ir_name, args.ir_ts_name])
     ensure_unpacked_sessions(args.raw_path, args.scratch, to_extract)
 
     # Scratch directory might not be created, if no sessions were unpacked.
