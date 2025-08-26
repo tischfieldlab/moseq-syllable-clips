@@ -6,6 +6,7 @@ import sys
 
 import numpy as np
 import psutil
+import pandas as pd
 
 from syllable_clips.session import ensure_unpacked_sessions
 from syllable_clips.syllable_clips import produce_clips
@@ -49,6 +50,7 @@ def main():
         subp.add_argument('--man-session-id-col', default='Session_ID')
         subp.add_argument('--fps', default=30, help="Frames per second")
         subp.add_argument('--scratch', help="Scratch location used for possible extraction")
+        subp.add_argument('--skip-session-unpack', action='store_true', help="Do not attempt to unpack compressed sessions, only use existing unpacked sessions")
         #subp.add_argument('--no-cleanup', action='store_false', dest='cleanup', help="Scratch location used for possible extraction")
         subp.add_argument('--cleanup', action='store_true', dest='cleanup', help="Cleanup scratch directory after processing")
         subp.add_argument('--crop-rgb', action='store', default='auto', help="Crop the rgb to the bounds of the extracted region. Auto crops to the ROI from extraction (old formats not supported). None will not crop. Or supply a list of coordinates as 'x1,y1,x2,y2' ex: '20,50,100,150'")
@@ -100,7 +102,14 @@ def main():
         to_extract.extend([args.rgb_name, args.rgb_ts_name])
     if "ir" in args.streams:
         to_extract.extend([args.ir_name, args.ir_ts_name])
-    ensure_unpacked_sessions(args.raw_path, args.scratch, to_extract)
+
+    if args.manifest is not None:
+        manifest = pd.read_csv(args.manifest, sep='\t')
+        session_ids = list(manifest[args.man_session_id_col].values)
+    else:
+        session_ids = None
+    if not args.skip_session_unpack:
+        ensure_unpacked_sessions(args.raw_path, args.scratch, to_extract, session_ids)
 
     # Scratch directory might not be created, if no sessions were unpacked.
     # If it exists, we can add it to the raw_path list.
