@@ -53,6 +53,8 @@ class VideoReader:
             slices (int): number of slices to use for reading frames
             slicecrc (int): check integrity of slices, defaults to 1
         """
+        if not os.path.exists(video_path):
+            raise FileNotFoundError(f'Video file "{video_path}" does not exist!')
         self.video_path = video_path
         self.out_pixel_format = out_pixel_format
         self.threads = threads
