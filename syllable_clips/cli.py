@@ -58,7 +58,7 @@ def main():
 
         subp.add_argument('--rgb-name', action='store', default='rgb.mp4', help="Name of the rgb video file within the raw data directory")
         subp.add_argument('--rgb-ts-name', action='store', default='rgb_ts.txt', help="Name of the rgb video timestamp file within the raw data directory")
-        subp.add_argument('--ir-name', action='store', default='ir.mp4', help="Name of the ir video file within the raw data directory")
+        subp.add_argument('--ir-name', action='store', default='ir.avi', help="Name of the ir video file within the raw data directory")
         subp.add_argument('--ir-ts-name', action='store', default='ir_ts.txt', help="Name of the ir video timestamp file within the raw data directory")
 
         pick_choices = ['median', 'longest', 'shortest', 'shuffle']
