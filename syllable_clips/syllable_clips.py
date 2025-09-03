@@ -267,8 +267,14 @@ def fetch_ir_clip(slice: Slice, raw_data_path: Union[str, List[str]], session_id
         offset = depth_times[0] - ir_times[0]
         start = (depth_times[slice[0][0]] - depth_times[0] + offset) / 1000
         stop = (depth_times[slice[0][1]] - depth_times[0] + offset) / 1000
+        slice_nframes = slice[0][1] - slice[0][0]
 
-        clip = VideoReader(ir_path).read_frames(start, stop)
+        reader = VideoReader(ir_path)
+        stop += 2 * (1/reader.info['fps']) # add a little extra time to ensure we get the full clip, otherwise we might miss the last frame
+        clip = reader.read_frames(start, stop)
+
+        if clip.shape[0] != slice_nframes:
+            clip = clip[:slice_nframes]  # trim to expected number of frames
 
         if crop == 'none':
             pass
