@@ -145,6 +145,7 @@ def generate_clips(slice: Slice, info: SliceInfo, args: Namespace) -> Dict[str, 
                 #print("RGB Clip shape: {}".format(clip.shape))
             elif stream == 'ir':
                 clip = fetch_ir_clip(slice, args.raw_path, info['session_id'], crop=args.crop_ir, ir_name=args.ir_name, ir_ts_name=args.ir_ts_name)
+                clip = np.clip(clip * args.ir_scale, 0, 255).astype(np.uint8)
                 onset_size = ensure_even(int(clip.shape[2] * 0.08))
             elif stream == 'depth':
                 clip = fetch_depth_clip(slice, args)

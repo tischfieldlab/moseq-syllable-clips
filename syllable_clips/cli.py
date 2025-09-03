@@ -60,6 +60,7 @@ def main():
         subp.add_argument('--rgb-ts-name', action='store', default='rgb_ts.txt', help="Name of the rgb video timestamp file within the raw data directory")
         subp.add_argument('--ir-name', action='store', default='ir.avi', help="Name of the ir video file within the raw data directory")
         subp.add_argument('--ir-ts-name', action='store', default='ir_ts.txt', help="Name of the ir video timestamp file within the raw data directory")
+        subp.add_argument('--ir-scale', action='store', default=24.0, type=float, help="Scaling factor for IR data, multiplied against raw pixel values.")
 
         pick_choices = ['median', 'longest', 'shortest', 'shuffle']
         subp.add_argument('--pick', choices=pick_choices, default=pick_choices[0], help="Method for choosing which syllable instance(s) to plot.")
