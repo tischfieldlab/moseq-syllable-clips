@@ -145,7 +145,7 @@ def sort_slices(slices: List[Slice], method: SortMethod) -> List[Slice]:
     '''
     if method == 'median':
         #sort by distance to the median duration
-        median_dur = np.median([s[0][1]-s[0][0] for s in slices])
+        median_dur = np.nanmedian([s[0][1]-s[0][0] for s in slices])
         return sorted(slices, key=lambda x: abs(median_dur - (x[0][1]-x[0][0])), reverse=False)
 
     elif method == 'longest':
